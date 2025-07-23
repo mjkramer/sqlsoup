@@ -8,7 +8,7 @@ from sqlalchemy.engine.base import Engine
 from sqlalchemy.orm import scoped_session, sessionmaker, mapper, \
                             class_mapper, relationship, session,\
                             object_session, attributes
-from sqlalchemy.orm.interfaces import MapperExtension, EXT_CONTINUE
+from sqlalchemy.event import listen
 from sqlalchemy.sql import expression
 import sys
 
@@ -31,30 +31,23 @@ object for each application thread which refers to it.
 
 """
 
-class AutoAdd(MapperExtension):
-    def __init__(self, scoped_session):
-        self.scoped_session = scoped_session
+def instrument_class(_mapper, klass):
+    def default_init(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+    klass.__init__ = default_init
 
-    def instrument_class(self, mapper, class_):
-        class_.__init__ = self._default__init__(mapper)
-
-    def _default__init__(ext, mapper):
-        def __init__(self, **kwargs):
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-        return __init__
-
-    def init_instance(self, mapper, class_, oldinit, instance, args, kwargs):
-        session = self.scoped_session()
+def init_fn(my_scoped_session):
+    def fn(instance, args, kwargs):
+        session = my_scoped_session()
         state = attributes.instance_state(instance)
         session._save_impl(state)
-        return EXT_CONTINUE
+    return fn
 
-    def init_failed(self, mapper, class_, oldinit, instance, args, kwargs):
-        sess = object_session(instance)
-        if sess:
-            sess.expunge(instance)
-        return EXT_CONTINUE
+def init_failure(instance, args, kwargs):
+    sess = object_session(instance)
+    if sess:
+        sess.expunge(instance)
 
 class SQLSoupError(Exception):
     pass
@@ -171,9 +164,11 @@ def _class_for_table(session, engine, selectable, base_cls, mapper_kwargs):
         setattr(klass, m, eval(m))
     klass._table = selectable
     klass.c = expression.ColumnCollection()
+    listen(klass, 'instrument_class', instrument_class)
+    listen(klass, 'init', init_fn(session))
+    listen(klass, 'init_failure', init_failure)
     mappr = mapper(klass,
                    selectable,
-                   extension=AutoAdd(session),
                    **mapper_kwargs)
 
     for k in mappr.iterate_properties:
