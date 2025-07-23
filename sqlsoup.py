@@ -177,8 +177,8 @@ def _class_for_table(session, engine, selectable, base_cls, mapper_kwargs):
                    selectable,
                    **mapper_kwargs)
 
-    # for k in mappr.iterate_properties:
-    #     klass.c[k.key] = k.columns[0]
+    for k in mappr.iterate_properties:
+        klass.c.add(k.columns[0], key=k.key)
 
     klass._query = session.query_property()
     return klass
