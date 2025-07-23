@@ -31,12 +31,6 @@ object for each application thread which refers to it.
 
 """
 
-def _clause_element_as_expr(element):
-    if hasattr(element, '__clause_element__'):
-        return element.__clause_element__()
-    else:
-        return element
-
 def instrument_class(_mapper, klass):
     def default_init(self, **kwargs):
         for key, value in kwargs.items():
@@ -126,6 +120,12 @@ def _selectable_name(selectable):
         if x[0] == '_':
             x = x[1:]
         return x
+
+def _clause_element_as_expr(element):
+    if hasattr(element, '__clause_element__'):
+        return element.__clause_element__()
+    else:
+        return element
 
 def _class_for_table(session, engine, selectable, base_cls, mapper_kwargs):
     selectable = _clause_element_as_expr(selectable)
