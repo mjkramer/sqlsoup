@@ -31,6 +31,12 @@ object for each application thread which refers to it.
 
 """
 
+def _clause_element_as_expr(element):
+    if hasattr(element, '__clause_element__'):
+        return element.__clause_element__()
+    else:
+        return element
+
 def instrument_class(_mapper, klass):
     def default_init(self, **kwargs):
         for key, value in kwargs.items():
@@ -122,7 +128,7 @@ def _selectable_name(selectable):
         return x
 
 def _class_for_table(session, engine, selectable, base_cls, mapper_kwargs):
-    selectable = expression._clause_element_as_expr(selectable)
+    selectable = _clause_element_as_expr(selectable)
     mapname = 'Mapped' + _selectable_name(selectable)
 
     if py2k and isinstance(mapname, unicode):
@@ -413,7 +419,7 @@ class SQLSoup(object):
 
         # TODO give meaningful aliases
         return self.map(
-                    expression._clause_element_as_expr(selectable).
+                    _clause_element_as_expr(selectable).
                             select(use_labels=True).
                             alias('foo'), base=base, **mapper_args)
 
